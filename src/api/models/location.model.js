@@ -31,7 +31,10 @@ const locationSchema = new mongoose.Schema(
     city: { type: String, default: "" },
     state: { type: String, default: "" },
     status: { type: Boolean, default: false },
-    pictures:{type:[String],default:null}
+    pictures:{type:[String],default:null},
+    place_id:{type:String,default:null},
+    
+    
   },
   {
     timestamps: true,
