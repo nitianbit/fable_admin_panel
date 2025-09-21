@@ -33,6 +33,7 @@ const permissionRoutes = require('./permission.route');
 const paymentgatewayRoutes = require('./paymentgateway.route');
 const MapRoutes = require('./map.route');
 const busScheduleRoutes = require('./busschedule.route');
+const operatorRoutes = require('./operator.route');
 const router = express.Router();
 
 /**
@@ -78,4 +79,5 @@ router.use('/permissions', permissionRoutes);
 router.use('/payment-gateways', paymentgatewayRoutes);
 router.use('/map', MapRoutes);
 router.use('/bus-schedules',busScheduleRoutes);
+router.use('/operators', operatorRoutes);
 module.exports = router;
