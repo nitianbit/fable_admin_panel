@@ -3,6 +3,7 @@ const { omitBy, isNil } = require('lodash');
 const bcrypt = require('bcryptjs');
 const moment = require('moment-timezone');
 const mongoosePaginate = require('mongoose-paginate-v2');
+const paginateAggregate = require('mongoose-aggregate-paginate-v2');
 const jwt = require('jwt-simple');
 const { jwtSecret, jwtExpirationInterval } = require('../../config/vars');
 
@@ -63,10 +64,6 @@ const operatorSchema = new mongoose.Schema({
         state: { type: String, default: "" },
         pincode: { type: String, default: "" },
         country: { type: String, default: "India" },
-        coordinates: {
-            type: { type: String, default: "Point" },
-            coordinates: [Number], // [longitude, latitude]
-        },
     },
     
     // Business Details
@@ -222,8 +219,8 @@ const operatorSchema = new mongoose.Schema({
     timestamps: true,
 });
 
-// Index for geospatial queries
-operatorSchema.index({ "address.coordinates": "2dsphere" });
+// Index for geospatial queries (commented out to avoid GeoJSON validation issues)
+// operatorSchema.index({ "address.coordinates": "2dsphere" });
 
 /**
  * Pre-save middleware
@@ -427,8 +424,9 @@ operatorSchema.statics = {
     },
 };
 
-// Add pagination plugin
+// Add pagination plugins
 operatorSchema.plugin(mongoosePaginate);
+operatorSchema.plugin(paginateAggregate);
 
 // Add activity logger plugin
 operatorSchema.plugin(require('@hilarion/mongoose-activity-logger'));

@@ -282,6 +282,7 @@ exports.update = async (req, res, next) => {
     }
 
     const FolderName = process.env.S3_BUCKET_OPERATOR || "operators";
+    
     const objUpdate = {
       companyName: req.body.companyName,
       companyCode: req.body.companyCode,
@@ -379,7 +380,7 @@ exports.update = async (req, res, next) => {
 
 exports.list = async (req, res, next) => {
   try {
-    let condition = req.query.global_search
+    let condition = req.query.global_search && req.query.global_search.trim()
       ? {
           $and: [
             { isDeleted: false },
@@ -387,37 +388,37 @@ exports.list = async (req, res, next) => {
               $or: [
                 {
                   companyName: {
-                    $regex: new RegExp(req.query.global_search),
+                    $regex: new RegExp(req.query.global_search.trim()),
                     $options: "i",
                   },
                 },
                 {
                   companyCode: {
-                    $regex: new RegExp(req.query.global_search),
+                    $regex: new RegExp(req.query.global_search.trim()),
                     $options: "i",
                   },
                 },
                 {
                   email: {
-                    $regex: new RegExp(req.query.global_search),
+                    $regex: new RegExp(req.query.global_search.trim()),
                     $options: "i",
                   },
                 },
                 {
                   phone: {
-                    $regex: new RegExp(req.query.global_search),
+                    $regex: new RegExp(req.query.global_search.trim()),
                     $options: "i",
                   },
                 },
                 {
                   registrationNumber: {
-                    $regex: new RegExp(req.query.global_search),
+                    $regex: new RegExp(req.query.global_search.trim()),
                     $options: "i",
                   },
                 },
                 {
                   'contactPerson.name': {
-                    $regex: new RegExp(req.query.global_search),
+                    $regex: new RegExp(req.query.global_search.trim()),
                     $options: "i",
                   },
                 },
@@ -427,33 +428,45 @@ exports.list = async (req, res, next) => {
         }
       : { isDeleted: false };
 
-    let sort = {};
-    if (!req.query.sort) {
-      sort = { createdAt: -1 };
-    } else {
-      const data = JSON.parse(req.query.sort);
-      sort = { [data.name]: data.order != "none" ? data.order : "asc" };
+    let sort = { createdAt: -1 }; // Default sort
+    if (req.query.sort) {
+      try {
+        const data = JSON.parse(req.query.sort);
+        if (data.name && data.order) {
+          sort = { [data.name]: data.order !== "none" ? data.order : "asc" };
+        }
+      } catch (error) {
+        console.log('Invalid sort parameter, using default sort');
+        sort = { createdAt: -1 };
+      }
     }
 
     if (req.query.filters) {
-      const filtersData = JSON.parse(req.query.filters);
-      if (filtersData.type == "simple") {
-        condition = {
-          ...condition,
-          [filtersData.name]: filtersData.text,
-        };
-      } else if (filtersData.type == "select") {
-        condition = {
-          ...condition,
-          [filtersData.name]: { $in: filtersData.selected_options },
-        };
+      try {
+        const filtersData = JSON.parse(req.query.filters);
+        if (filtersData.type === "simple") {
+          condition = {
+            ...condition,
+            [filtersData.name]: filtersData.text,
+          };
+        } else if (filtersData.type === "select") {
+          condition = {
+            ...condition,
+            [filtersData.name]: { $in: filtersData.selected_options },
+          };
+        }
+      } catch (error) {
+        console.log('Invalid filters parameter, ignoring filters');
       }
     }
 
     const aggregateQuery = Operator.aggregate([
       {
+        $match: condition,
+      },
+      {
         $project: {
-          ids: "$_id",
+          _id: 1,
           companyName: 1,
           companyCode: 1,
           businessType: 1,
@@ -475,9 +488,6 @@ exports.list = async (req, res, next) => {
           updatedAt: 1,
         }
       },
-      {
-        $match: condition,
-      },
     ]);
 
     const options = {
@@ -491,9 +501,20 @@ exports.list = async (req, res, next) => {
       sort,
     };
 
-    const result = await Operator.aggregatePaginate(aggregateQuery, options);
-
-    res.json({ data: result });
+    try {
+      const result = await Operator.aggregatePaginate(aggregateQuery, options);
+      res.json({ data: result });
+    } catch (aggregateError) {
+      console.error('Aggregate pagination error:', aggregateError);
+      // Fallback to regular pagination if aggregate pagination fails
+      const fallbackResult = await Operator.paginate(condition, {
+        page: req.query.page || 1,
+        limit: req.query.per_page || 10,
+        sort: sort,
+        select: 'companyName companyCode businessType email phone countryCode registrationNumber licenseNumber licenseExpiryDate contactPerson status isVerified fleetSize maxFleetSize maxNoOfSeats commissionRate paymentTerms createdAt updatedAt'
+      });
+      res.json({ data: fallbackResult });
+    }
   } catch (error) {
     next(error);
   }

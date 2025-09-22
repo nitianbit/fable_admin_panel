@@ -15,16 +15,12 @@ const createOperator = {
       city: Joi.string().allow(''),
       state: Joi.string().allow(''),
       pincode: Joi.string().allow(''),
-      country: Joi.string().default('India'),
-      coordinates: Joi.object().keys({
-        type: Joi.string().default('Point'),
-        coordinates: Joi.array().items(Joi.number()).length(2)
-      }).allow(null)
+      country: Joi.string().default('India')
     }).default({}),
-    registrationNumber: Joi.string().required().trim().min(5).max(50),
+    registrationNumber: Joi.string().required().trim().min(3).max(50),
     gstNumber: Joi.string().trim().min(15).max(15).allow(''),
     panNumber: Joi.string().trim().min(10).max(10).allow(''),
-    licenseNumber: Joi.string().required().trim().min(5).max(50),
+    licenseNumber: Joi.string().required().trim().min(3).max(50),
     licenseExpiryDate: Joi.date().required(),
     contactPerson: Joi.object().keys({
       name: Joi.string().required().trim().min(2).max(50),
@@ -91,16 +87,12 @@ const updateOperator = {
       city: Joi.string().allow(''),
       state: Joi.string().allow(''),
       pincode: Joi.string().allow(''),
-      country: Joi.string(),
-      coordinates: Joi.object().keys({
-        type: Joi.string().default('Point'),
-        coordinates: Joi.array().items(Joi.number()).length(2)
-      }).allow(null)
+      country: Joi.string()
     }),
-    registrationNumber: Joi.string().trim().min(5).max(50),
+    registrationNumber: Joi.string().trim().min(3).max(50),
     gstNumber: Joi.string().trim().min(15).max(15).allow(''),
     panNumber: Joi.string().trim().min(10).max(10).allow(''),
-    licenseNumber: Joi.string().trim().min(5).max(50),
+    licenseNumber: Joi.string().trim().min(3).max(50),
     licenseExpiryDate: Joi.date(),
     contactPerson: Joi.object().keys({
       name: Joi.string().trim().min(2).max(50),
