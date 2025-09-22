@@ -13,6 +13,10 @@
   "scripts": {
     "start": "cross-env TZ='Africa/Cairo' NODE_ENV=production pm2 start -i max ./src/index.js --name=gosmartAdminAPI",
     "dev": "nodemon ./src/index.js",
+    "create-admin": "node scripts/create_admin.js",
+    "create-admin-full": "node scripts/create_admin_with_permissions.js",
+    "fix-permissions": "node scripts/quick_fix_permissions.js",
+    "add-permissions": "node scripts/add_permissions_to_role.js",
     "lint": "eslint ./src/ --ignore-path .gitignore --ignore-pattern internals/scripts",
     "lint:fix": "yarn lint --fix",
     "lint:watch": "yarn lint --watch",

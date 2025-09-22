@@ -3,6 +3,8 @@ const { omitBy, isNil } = require('lodash');
 const bcrypt = require('bcryptjs');
 const moment = require('moment-timezone');
 const mongoosePaginate = require('mongoose-paginate-v2');
+const jwt = require('jwt-simple');
+const { jwtSecret, jwtExpirationInterval } = require('../../config/vars');
 
 /**
  * Operator Schema
@@ -146,6 +148,12 @@ const operatorSchema = new mongoose.Schema({
         type: Number,
         default: 100,
     },
+    maxNoOfSeats: {
+        type: Number,
+        default: 50,
+        min: 1,
+        max: 100,
+    },
     
     // Commission and Payment Settings
     commissionRate: {
@@ -245,7 +253,7 @@ operatorSchema.methods = {
             'id', 'companyName', 'companyCode', 'businessType', 'email', 'phone', 
             'countryCode', 'address', 'registrationNumber', 'gstNumber', 'panNumber',
             'licenseNumber', 'licenseExpiryDate', 'contactPerson', 'documents',
-            'status', 'isVerified', 'fleetSize', 'maxFleetSize', 'commissionRate',
+            'status', 'isVerified', 'fleetSize', 'maxFleetSize', 'maxNoOfSeats', 'commissionRate',
             'paymentTerms', 'description', 'website', 'socialMedia', 'language',
             'createdAt', 'updatedAt', 'lastLoginAt', 'verifiedAt'
         ];
@@ -274,6 +282,17 @@ operatorSchema.methods = {
         const regex = /(http|https):\/\/(\w+:{0,1}\w*)?(\S+)(:[0-9]+)?(\/|\/([\w#!:.?+=&%!\-\/]))?/;
         return regex.test(str);
     },
+
+    token() {
+        const payload = {
+            exp: moment().add(jwtExpirationInterval, 'minutes').unix(),
+            iat: moment().unix(),
+            sub: this._id,
+            type: 'Bearer',
+            userType: 'operator',
+        };
+        return jwt.encode(payload, jwtSecret);
+    },
 };
 
 /**
@@ -298,6 +317,7 @@ operatorSchema.statics = {
                 contactPerson: item.contactPerson.name,
                 fleetSize: item.fleetSize,
                 maxFleetSize: item.maxFleetSize,
+                maxNoOfSeats: item.maxNoOfSeats,
                 status: item.status,
                 isVerified: item.isVerified ? 'Verified' : 'Not Verified',
                 createdAt: moment.utc(item.createdAt).tz("Asia/Kolkata").format("DD MMM YYYY"),

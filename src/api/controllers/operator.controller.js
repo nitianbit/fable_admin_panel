@@ -159,6 +159,7 @@ exports.create = async (req, res, next) => {
       status,
       fleetSize,
       maxFleetSize,
+      maxNoOfSeats,
       commissionRate,
       paymentTerms,
       description,
@@ -186,6 +187,7 @@ exports.create = async (req, res, next) => {
       status,
       fleetSize,
       maxFleetSize,
+      maxNoOfSeats,
       commissionRate,
       paymentTerms,
       description,
@@ -298,6 +300,7 @@ exports.update = async (req, res, next) => {
       status: req.body.status,
       fleetSize: req.body.fleetSize,
       maxFleetSize: req.body.maxFleetSize,
+      maxNoOfSeats: req.body.maxNoOfSeats,
       commissionRate: req.body.commissionRate,
       paymentTerms: req.body.paymentTerms,
       description: req.body.description,
@@ -465,6 +468,7 @@ exports.list = async (req, res, next) => {
           isVerified: 1,
           fleetSize: 1,
           maxFleetSize: 1,
+          maxNoOfSeats: 1,
           commissionRate: 1,
           paymentTerms: 1,
           createdAt: 1,
@@ -606,6 +610,99 @@ exports.changeStatus = async (req, res, next) => {
       status: true,
       message: `Operator status changed to ${status} successfully.`,
       data: updatedOperator.transform(),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Get operator profile (for logged-in operator)
+ * @public
+ */
+exports.getOperatorProfile = async (req, res, next) => {
+  try {
+    const operator = req.operator; // Set by operatorAuth middleware
+    
+    res.status(httpStatus.OK).json({
+      message: "Operator profile fetched successfully.",
+      data: operator.transform(),
+      status: true,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Update operator profile (for logged-in operator)
+ * @public
+ */
+exports.updateOperatorProfile = async (req, res, next) => {
+  try {
+    const operator = req.operator; // Set by operatorAuth middleware
+    const allowedFields = [
+      'phone', 'countryCode', 'alternatePhone', 'address', 
+      'contactPerson', 'description', 'website', 'socialMedia'
+    ];
+    
+    const updateData = {};
+    allowedFields.forEach(field => {
+      if (req.body[field] !== undefined) {
+        updateData[field] = req.body[field];
+      }
+    });
+
+    const updatedOperator = await Operator.findByIdAndUpdate(
+      operator._id,
+      { $set: updateData },
+      { new: true }
+    );
+
+    res.status(httpStatus.OK).json({
+      status: true,
+      message: "Operator profile updated successfully.",
+      data: updatedOperator.transform(),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Get operator dashboard data
+ * @public
+ */
+exports.getOperatorDashboard = async (req, res, next) => {
+  try {
+    const operator = req.operator; // Set by operatorAuth middleware
+    
+    // Get basic operator stats
+    const Bus = require("../models/bus.model");
+    const totalBuses = await Bus.countDocuments({ operatorId: operator._id });
+    const activeBuses = await Bus.countDocuments({ 
+      operatorId: operator._id, 
+      status: true 
+    });
+
+    const dashboardData = {
+      operator: operator.transform(),
+      stats: {
+        totalBuses,
+        activeBuses,
+        fleetSize: operator.fleetSize,
+        maxFleetSize: operator.maxFleetSize,
+        maxNoOfSeats: operator.maxNoOfSeats,
+        commissionRate: operator.commissionRate,
+        paymentTerms: operator.paymentTerms,
+      },
+      recentActivity: [], // You can add recent activity logic here
+    };
+
+    res.status(httpStatus.OK).json({
+      message: "Operator dashboard data fetched successfully.",
+      data: dashboardData,
+      status: true,
     });
   } catch (error) {
     next(error);

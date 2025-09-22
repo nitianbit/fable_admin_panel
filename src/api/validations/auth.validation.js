@@ -19,6 +19,14 @@ const login = {
   }),
 };
 
+// POST /v1/auth/operator-login
+const operatorLogin = {
+  body: Joi.object().keys({
+    email: Joi.string().required().email(),
+    password: Joi.string().required(),
+  }),
+};
+
 const update = {
   body: {
     email: Joi.string().email(),
@@ -65,13 +73,32 @@ const passwordReset = {
   },
 };
 
+// POST /v1/auth/operator-send-password-reset
+const sendOperatorPasswordReset = {
+  body: {
+    email: Joi.string().email().required(),
+  },
+};
+
+// POST /v1/auth/operator-reset-password
+const operatorPasswordReset = {
+  body: {
+    email: Joi.string().email().required(),
+    password: Joi.string().required().custom(password),
+    resetToken: Joi.string().required(),
+  },
+};
+
 module.exports = {
   register,
   login,
+  operatorLogin,
   update,
   oAuth,
   refresh,
   sendPasswordReset,
-  passwordReset
+  passwordReset,
+  sendOperatorPasswordReset,
+  operatorPasswordReset
 };
 

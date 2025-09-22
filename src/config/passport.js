@@ -4,6 +4,7 @@ const { ExtractJwt } = require('passport-jwt');
 const { jwtSecret } = require('./vars');
 const authProviders = require('../api/services/authProviders');
 const Admin = require('../api/models/admin.model');
+const Operator = require('../api/models/Operator.model');
 
 const jwtOptions = {
   secretOrKey: jwtSecret,
@@ -12,8 +13,24 @@ const jwtOptions = {
 
 const jwt = async (payload, done) => {
   try {
-    const user = await Admin.findById(payload.sub);
-    if (user) return done(null, user);
+    // Check if it's an operator token
+    if (payload.userType === 'operator') {
+      const operator = await Operator.findById(payload.sub);
+      if (operator && !operator.isDeleted) {
+        // Add userType to distinguish from admin
+        const operatorUser = operator.toObject();
+        operatorUser.userType = 'operator';
+        return done(null, operatorUser);
+      }
+    } else {
+      // Default to admin authentication
+      const user = await Admin.findById(payload.sub);
+      if (user) {
+        const adminUser = user.toObject();
+        adminUser.userType = 'admin';
+        return done(null, adminUser);
+      }
+    }
     return done(null, false);
   } catch (error) {
     return done(error, false);

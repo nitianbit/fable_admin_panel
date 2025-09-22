@@ -1,5 +1,6 @@
 const httpStatus = require("http-status");
 const Admin = require("../models/admin.model");
+const Operator = require("../models/Operator.model");
 const Role = require("../models/role.model");
 const AdminDetail = require("../models/adminDetail.model");
 const AdminRole = require("../models/adminRole.model");
@@ -107,6 +108,29 @@ exports.login = async (req, res, next) => {
   }
 };
 
+/**
+ * Returns jwt token if valid operator email and password is provided
+ * @public
+ */
+exports.operatorLogin = async (req, res, next) => {
+  try {
+    const { operator, accessToken } = await Operator.findAndGenerateToken(req.body);
+    const token = generateTokenResponse(operator, accessToken);
+    const operatorTransformed = operator.transform();
+
+    // Add user type to distinguish from admin
+    operatorTransformed.userType = 'operator';
+    
+    return res.json({ 
+      token, 
+      operator: operatorTransformed,
+      message: 'Operator login successful'
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
 exports.access = async (req, res, next) => {
   try {
     const { roleId } = req.body;
@@ -202,6 +226,33 @@ exports.sendPasswordReset = async (req, res, next) => {
   }
 };
 
+/**
+ * Send password reset for operator
+ * @public
+ */
+exports.sendOperatorPasswordReset = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    const operator = await Operator.findOne({ email, isDeleted: false }).exec();
+
+    if (operator) {
+      const passwordResetObj = await PasswordResetToken.generate(operator);
+      emailProvider.sendPasswordReset(passwordResetObj);
+      res.status(httpStatus.OK);
+      return res.json({
+        message: `We have successfully sent reset link to your email ${email}.`,
+        status: true,
+      });
+    }
+    throw new APIError({
+      status: httpStatus.UNAUTHORIZED,
+      message: "No operator account found with that email address",
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
 exports.resetPassword = async (req, res, next) => {
   try {
     const { email, password, resetToken } = req.body;
@@ -237,6 +288,56 @@ exports.resetPassword = async (req, res, next) => {
     return res.json({
       message:
         "Your password for Ferri has been changed successfully. You can now login with your new password",
+      status: true,
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+/**
+ * Reset operator password
+ * @public
+ */
+exports.resetOperatorPassword = async (req, res, next) => {
+  try {
+    const { email, password, resetToken } = req.body;
+    const resetTokenObject = await PasswordResetToken.findOneAndRemove({
+      userEmail: email,
+      resetToken,
+    });
+
+    if (!resetTokenObject) {
+      throw new APIError({
+        status: httpStatus.UNAUTHORIZED,
+        message: "Cannot find matching reset token",
+      });
+    }
+    if (moment().isAfter(resetTokenObject.expires)) {
+      throw new APIError({
+        status: httpStatus.UNAUTHORIZED,
+        message: "Reset token is expired",
+      });
+    }
+
+    const operator = await Operator.findOne({
+      email: resetTokenObject.userEmail,
+      isDeleted: false,
+    }).exec();
+    
+    if (!operator) {
+      throw new APIError({
+        status: httpStatus.UNAUTHORIZED,
+        message: "Operator not found",
+      });
+    }
+    
+    operator.password = password;
+    await operator.save();
+    emailProvider.sendPasswordChangeEmail(operator);
+    res.status(httpStatus.OK);
+    return res.json({
+      message: "Your operator password has been changed successfully. You can now login with your new password",
       status: true,
     });
   } catch (error) {

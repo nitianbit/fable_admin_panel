@@ -70,6 +70,34 @@ router.route('/register')
 router.route('/login')
   .post(Validate(authValidation.login), controller.login);
 
+/**
+ * @api {post} v1/auth/operator-login Operator Login
+ * @apiDescription Get an accessToken for operator
+ * @apiVersion 1.0.0
+ * @apiName OperatorLogin
+ * @apiGroup Auth
+ * @apiPermission public
+ *
+ * @apiParam  {String}         email     Operator's email
+ * @apiParam  {String{..128}}  password  Operator's password
+ *
+ * @apiSuccess  {String}  token.tokenType     Access Token's type
+ * @apiSuccess  {String}  token.accessToken   Authorization Token
+ * @apiSuccess  {String}  token.refreshToken  Token to get a new accessToken
+ * @apiSuccess  {Number}  token.expiresIn     Access Token's expiration time
+ *
+ * @apiSuccess  {String}  operator.id         Operator's id
+ * @apiSuccess  {String}  operator.companyName Operator's company name
+ * @apiSuccess  {String}  operator.email      Operator's email
+ * @apiSuccess  {String}  operator.userType   User type (operator)
+ * @apiSuccess  {Date}    operator.createdAt  Timestamp
+ *
+ * @apiError (Bad Request 400)  ValidationError  Some parameters may contain invalid values
+ * @apiError (Unauthorized 401)  Unauthorized     Incorrect email or password
+ */
+router.route('/operator-login')
+  .post(Validate(authValidation.operatorLogin), controller.operatorLogin);
+
 
 /**
  * @api {post} v1/auth/refresh-token Refresh Token
@@ -99,6 +127,46 @@ router.route('/send-password-reset')
 
 router.route('/reset-password')
   .post(Validate(authValidation.passwordReset), controller.resetPassword);
+
+/**
+ * @api {post} v1/auth/operator-send-password-reset Send Operator Password Reset
+ * @apiDescription Send password reset email to operator
+ * @apiVersion 1.0.0
+ * @apiName SendOperatorPasswordReset
+ * @apiGroup Auth
+ * @apiPermission public
+ *
+ * @apiParam  {String}  email  Operator's email
+ *
+ * @apiSuccess {String}  message  Success message
+ * @apiSuccess {Boolean} status   Success status
+ *
+ * @apiError (Bad Request 400)  ValidationError  Some parameters may contain invalid values
+ * @apiError (Unauthorized 401)  Unauthorized     No operator found with that email
+ */
+router.route('/operator-send-password-reset')
+  .post(Validate(authValidation.sendOperatorPasswordReset), controller.sendOperatorPasswordReset);
+
+/**
+ * @api {post} v1/auth/operator-reset-password Reset Operator Password
+ * @apiDescription Reset operator password with token
+ * @apiVersion 1.0.0
+ * @apiName ResetOperatorPassword
+ * @apiGroup Auth
+ * @apiPermission public
+ *
+ * @apiParam  {String}  email      Operator's email
+ * @apiParam  {String}  password   New password
+ * @apiParam  {String}  resetToken Reset token from email
+ *
+ * @apiSuccess {String}  message  Success message
+ * @apiSuccess {Boolean} status   Success status
+ *
+ * @apiError (Bad Request 400)  ValidationError  Some parameters may contain invalid values
+ * @apiError (Unauthorized 401)  Unauthorized     Invalid or expired token
+ */
+router.route('/operator-reset-password')
+  .post(Validate(authValidation.operatorPasswordReset), controller.resetOperatorPassword);
 
 /**
  * @api {post} v1/auth/facebook Facebook Login

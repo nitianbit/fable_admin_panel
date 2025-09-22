@@ -1,6 +1,7 @@
 const httpStatus = require('http-status');
 const passport = require('passport');
 const Admin = require('../models/admin.model');
+const Operator = require('../models/Operator.model');
 const Role = require('../models/role.model');
 const Resource = require('../models/resource.model');
 const APIError = require('../utils/APIError');
@@ -126,3 +127,48 @@ exports.getAuth =
         { session: false },
         authHandleJWT(req, res, next, ...permissions),
       )(req, res, next);
+
+/**
+ * Operator authentication middleware
+ * Simpler authentication for operators without role-based permissions
+ */
+const operatorAuthHandleJWT = (req, res, next) => async (err, user, info) => {
+  const error = err || info;
+  const logIn = Promise.promisify(req.logIn);
+  const apiError = new APIError({
+    message: error ? error.message : 'Unauthorized',
+    status: httpStatus.UNAUTHORIZED,
+    stack: error ? error.stack : undefined,
+  });
+
+  try {
+    if (error || !user) throw error;
+    await logIn(user, { session: false });
+  } catch (e) {
+    return next(apiError);
+  }
+
+  // Check if user is an operator and is active
+  if (user && user.userType === 'operator') {
+    const operator = await Operator.findById(user.id).exec();
+    if (!operator || operator.isDeleted || operator.status === 'Inactive') {
+      apiError.status = httpStatus.FORBIDDEN;
+      apiError.message = 'Operator account is inactive or deleted';
+      return next(apiError);
+    }
+    req.user = user;
+    req.operator = operator;
+    return next();
+  }
+
+  apiError.status = httpStatus.FORBIDDEN;
+  apiError.message = 'Access denied. Operator authentication required.';
+  return next(apiError);
+};
+
+exports.operatorAuth = (req, res, next) =>
+  passport.authenticate(
+    'jwt',
+    { session: false },
+    operatorAuthHandleJWT(req, res, next),
+  )(req, res, next);

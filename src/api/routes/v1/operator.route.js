@@ -4,6 +4,7 @@ const controller = require('../../controllers/operator.controller');
 const {
   authorize,
   getAuth,
+  operatorAuth,
   LOGGED_USER,
 } = require('../../middlewares/auth');
 const { operatorValidation } = require('../../validations');
@@ -51,5 +52,15 @@ router
 router
   .route('/:operatorId/:documentType')
   .patch(getAuth('operator.edit', 'master.admin'), Validate(operatorValidation.uploadDocument), upload.single('pic'), controller.uploadDocument);
+
+// Operator-specific routes (require operator authentication)
+router
+  .route('/profile')
+  .get(operatorAuth, controller.getOperatorProfile)
+  .patch(operatorAuth, controller.updateOperatorProfile);
+
+router
+  .route('/dashboard')
+  .get(operatorAuth, controller.getOperatorDashboard);
 
 module.exports = router;
