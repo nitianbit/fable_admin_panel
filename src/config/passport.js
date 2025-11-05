@@ -18,8 +18,9 @@ const jwt = async (payload, done) => {
       const operator = await Operator.findById(payload.sub);
       if (operator && !operator.isDeleted) {
         // Add userType to distinguish from admin
-        const operatorUser = operator.toObject();
+        const operatorUser = operator.toObject({ virtuals: true });
         operatorUser.userType = 'operator';
+        operatorUser.id = operatorUser._id.toString(); // Ensure id field is available
         return done(null, operatorUser);
       }
     } else {

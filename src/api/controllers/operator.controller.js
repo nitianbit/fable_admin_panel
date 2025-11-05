@@ -155,6 +155,7 @@ exports.create = async (req, res, next) => {
       licenseNumber,
       licenseExpiryDate,
       contactPerson,
+      roleId,
       password,
       status,
       fleetSize,
@@ -184,6 +185,7 @@ exports.create = async (req, res, next) => {
       licenseNumber,
       licenseExpiryDate,
       contactPerson,
+      roleId: roleId || null,
       status,
       fleetSize,
       maxFleetSize,
@@ -283,31 +285,22 @@ exports.update = async (req, res, next) => {
 
     const FolderName = process.env.S3_BUCKET_OPERATOR || "operators";
     
-    const objUpdate = {
-      companyName: req.body.companyName,
-      companyCode: req.body.companyCode,
-      businessType: req.body.businessType,
-      email: req.body.email,
-      phone: req.body.phone,
-      countryCode: req.body.countryCode,
-      alternatePhone: req.body.alternatePhone,
-      address: req.body.address,
-      registrationNumber: req.body.registrationNumber,
-      gstNumber: req.body.gstNumber,
-      panNumber: req.body.panNumber,
-      licenseNumber: req.body.licenseNumber,
-      licenseExpiryDate: req.body.licenseExpiryDate,
-      contactPerson: req.body.contactPerson,
-      status: req.body.status,
-      fleetSize: req.body.fleetSize,
-      maxFleetSize: req.body.maxFleetSize,
-      maxNoOfSeats: req.body.maxNoOfSeats,
-      commissionRate: req.body.commissionRate,
-      paymentTerms: req.body.paymentTerms,
-      description: req.body.description,
-      website: req.body.website,
-      socialMedia: req.body.socialMedia,
-    };
+    // Only include fields that are provided in the request
+    const allowedFields = [
+      'companyName', 'companyCode', 'businessType', 'email', 'phone',
+      'countryCode', 'alternatePhone', 'address', 'registrationNumber',
+      'gstNumber', 'panNumber', 'licenseNumber', 'licenseExpiryDate',
+      'contactPerson', 'status', 'fleetSize', 'maxFleetSize', 'roleId',
+      'maxNoOfSeats', 'commissionRate', 'paymentTerms', 'description',
+      'website', 'socialMedia'
+    ];
+    
+    const objUpdate = {};
+    allowedFields.forEach(field => {
+      if (req.body[field] !== undefined) {
+        objUpdate[field] = req.body[field];
+      }
+    });
 
     // Handle password update
     if (req.body.password) {
@@ -662,9 +655,17 @@ exports.getOperatorProfile = async (req, res, next) => {
 exports.updateOperatorProfile = async (req, res, next) => {
   try {
     const operator = req.operator; // Set by operatorAuth middleware
+    const FolderName = process.env.S3_BUCKET_OPERATOR || "operators";
+    
+    // Allow all fields except admin-controlled ones (status, isVerified, isDeleted, roleId)
     const allowedFields = [
-      'phone', 'countryCode', 'alternatePhone', 'address', 
-      'contactPerson', 'description', 'website', 'socialMedia'
+      'companyName', 'companyCode', 'businessType', 'email', 'phone',
+      'countryCode', 'alternatePhone', 'address', 'registrationNumber',
+      'gstNumber', 'panNumber', 'licenseNumber', 'licenseExpiryDate',
+      'contactPerson', 'fleetSize', 'maxFleetSize', 'maxNoOfSeats',
+      'commissionRate', 'paymentTerms', 'description', 'website',
+      'socialMedia', 'deviceToken', 'deviceType', 'deviceId', 'deviceInfo',
+      'language'
     ];
     
     const updateData = {};
@@ -673,6 +674,47 @@ exports.updateOperatorProfile = async (req, res, next) => {
         updateData[field] = req.body[field];
       }
     });
+
+    // Handle password update
+    if (req.body.password) {
+      updateData.password = req.body.password;
+    }
+
+    // Handle document updates
+    if (req.body.documents) {
+      const documentFields = [
+        'registrationCertificate',
+        'gstCertificate',
+        'panCard', 
+        'licenseDocument',
+        'insuranceDocument',
+        'permitDocument',
+        'logo'
+      ];
+
+      for (const field of documentFields) {
+        if (req.body.documents[field]) {
+          // Check if it's a base64 string (starts with data:image or is a valid base64)
+          const isBase64 = typeof req.body.documents[field] === 'string' && 
+            (req.body.documents[field].startsWith('data:image') || 
+             req.body.documents[field].startsWith('data:application') ||
+             /^data:[a-zA-Z0-9]+\/[a-zA-Z0-9]+;base64,/.test(req.body.documents[field]));
+          
+          if (isBase64) {
+            // Delete old document if exists
+            if (operator.documents && operator.documents[field]) {
+              await imageDelete(operator.documents[field], FolderName);
+            }
+            
+            updateData[`documents.${field}`] = await imageUpload(
+              req.body.documents[field],
+              `${uuidv4()}-${field}`,
+              FolderName
+            );
+          }
+        }
+      }
+    }
 
     const updatedOperator = await Operator.findByIdAndUpdate(
       operator._id,
@@ -686,6 +728,24 @@ exports.updateOperatorProfile = async (req, res, next) => {
       data: updatedOperator.transform(),
     });
   } catch (error) {
+    if (error.name === 'MongoError' && error.code === 11000) {
+      if (error.keyPattern.email) {
+        return res.status(httpStatus.CONFLICT).json({
+          message: 'Email already exists',
+          status: false,
+        });
+      } else if (error.keyPattern.companyCode) {
+        return res.status(httpStatus.CONFLICT).json({
+          message: 'Company code already exists',
+          status: false,
+        });
+      } else if (error.keyPattern.registrationNumber) {
+        return res.status(httpStatus.CONFLICT).json({
+          message: 'Registration number already exists',
+          status: false,
+        });
+      }
+    }
     next(error);
   }
 };

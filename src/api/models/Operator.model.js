@@ -136,6 +136,14 @@ const operatorSchema = new mongoose.Schema({
         default: false,
     },
     
+    // Role assignment (optional)
+    roleId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Role',
+        default: null,
+        index: true,
+    },
+
     // Fleet Information
     fleetSize: {
         type: Number,
@@ -251,7 +259,7 @@ operatorSchema.methods = {
             'countryCode', 'address', 'registrationNumber', 'gstNumber', 'panNumber',
             'licenseNumber', 'licenseExpiryDate', 'contactPerson', 'documents',
             'status', 'isVerified', 'fleetSize', 'maxFleetSize', 'maxNoOfSeats', 'commissionRate',
-            'paymentTerms', 'description', 'website', 'socialMedia', 'language',
+            'paymentTerms', 'description', 'website', 'socialMedia', 'language', 'roleId',
             'createdAt', 'updatedAt', 'lastLoginAt', 'verifiedAt'
         ];
 
@@ -271,8 +279,8 @@ operatorSchema.methods = {
         return transformed;
     },
 
-    async passwordMatches(password) {
-        return bcrypt.compare(password, this.password);
+    async passwordMatches(password,currentPassword) {
+        return bcrypt.compare(password, currentPassword);
     },
 
     isValidURL(str) {
@@ -282,7 +290,7 @@ operatorSchema.methods = {
 
     token() {
         const payload = {
-            exp: moment().add(jwtExpirationInterval, 'minutes').unix(),
+            exp: moment().add(jwtExpirationInterval, 'days').unix(),
             iat: moment().unix(),
             sub: this._id,
             type: 'Bearer',
@@ -369,7 +377,7 @@ operatorSchema.statics = {
         }
 
         if (password) {
-            if (await operator.passwordMatches(password)) {
+            if (await operator.passwordMatches(password,operator.password)) {
                 return {
                     operator,
                     accessToken: operator.token(),

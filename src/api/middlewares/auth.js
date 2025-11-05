@@ -150,7 +150,14 @@ const operatorAuthHandleJWT = (req, res, next) => async (err, user, info) => {
 
   // Check if user is an operator and is active
   if (user && user.userType === 'operator') {
-    const operator = await Operator.findById(user.id).exec();
+    // Use _id or id field (passport strategy provides both)
+    const operatorId = user._id || user.id;
+    if (!operatorId) {
+      apiError.status = httpStatus.FORBIDDEN;
+      apiError.message = 'Invalid operator token';
+      return next(apiError);
+    }
+    const operator = await Operator.findById(operatorId).exec();
     if (!operator || operator.isDeleted || operator.status === 'Inactive') {
       apiError.status = httpStatus.FORBIDDEN;
       apiError.message = 'Operator account is inactive or deleted';

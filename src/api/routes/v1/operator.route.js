@@ -31,6 +31,16 @@ router
   .route('/search')
   .get(getAuth('operator.view', 'master.admin'), Validate(operatorValidation.listOperators), controller.list);
 
+// Operator-specific routes (require operator authentication) - MUST come before /:operatorId route
+router
+  .route('/profile')
+  .get(operatorAuth, controller.getOperatorProfile)
+  .patch(operatorAuth, controller.updateOperatorProfile);
+
+router
+  .route('/dashboard')
+  .get(operatorAuth, controller.getOperatorDashboard);
+
 // Get single operator
 router
   .route('/:operatorId')
@@ -52,15 +62,5 @@ router
 router
   .route('/:operatorId/:documentType')
   .patch(getAuth('operator.edit', 'master.admin'), Validate(operatorValidation.uploadDocument), upload.single('pic'), controller.uploadDocument);
-
-// Operator-specific routes (require operator authentication)
-router
-  .route('/profile')
-  .get(operatorAuth, controller.getOperatorProfile)
-  .patch(operatorAuth, controller.updateOperatorProfile);
-
-router
-  .route('/dashboard')
-  .get(operatorAuth, controller.getOperatorDashboard);
 
 module.exports = router;
