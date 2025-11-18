@@ -1,6 +1,7 @@
 const httpStatus = require("http-status");
 const { omit, isEmpty } = require("lodash");
 const Booking = require("../models/booking.model");
+const Bus = require("../models/bus.model");
 const User = require("../models/user.model");
 const Payment = require("../models/payment.model");
 const Currency = require("../models/currency.model");
@@ -91,34 +92,38 @@ exports.get = async (req, res) => {
  */
 exports.list = async (req, res, next) => {
   try {
-    let condition = req.query.search
-      ? {
-          $or: [
-            {
-              fullname: {
-                $regex: new RegExp(req.query.search),
-                $options: "i",
-              },
-            },
-            {
-              email: {
-                $regex: new RegExp(req.query.search),
-                $options: "i",
-              },
-            },
-            {
-              phone: {
-                $regex: new RegExp(req.query.search),
-                $options: "i",
-              },
-            },
-          ],
-          is_deleted: false,
-        }
-      : {
-          travel_status: req.query.travel_status,
-          is_deleted: false,
-        };
+
+    const hasTravelStatus = Boolean(req.query.travel_status);
+    let condition = {
+      is_deleted: false,
+    };
+
+    if (req.query.search) {
+      condition.$or = [
+        {
+          fullname: {
+            $regex: new RegExp(req.query.search),
+            $options: "i",
+          },
+        },
+        {
+          email: {
+            $regex: new RegExp(req.query.search),
+            $options: "i",
+          },
+        },
+        {
+          phone: {
+            $regex: new RegExp(req.query.search),
+            $options: "i",
+          },
+        },
+      ];
+    }
+
+    if (hasTravelStatus) {
+      condition.travel_status = req.query.travel_status;
+    }
 
     let sort = {};
     if (req.query.sortBy != "" && req.query.sortType != "") {
@@ -133,8 +138,8 @@ exports.list = async (req, res, next) => {
       if (filtersData.type === "select") {
         console.log("name", filtersData.name, filtersData.selected_options[0]);
         filters = {
-          travel_status: req.query.travel_status,
           is_deleted: false,
+          ...(hasTravelStatus ? { travel_status: req.query.travel_status } : {}),
         };
       } else if (filtersData.type === "date") {
         const today = moment(filtersData.value.startDate);
@@ -143,15 +148,60 @@ exports.list = async (req, res, next) => {
             $gte: today.toDate(),
             $lte: today.endOf("day").toDate(),
           },
-          travel_status: req.query.travel_status,
           is_deleted: false,
+          ...(hasTravelStatus ? { travel_status: req.query.travel_status } : {}),
         };
       }
     }
 
+    // If user is an operator, get all busIds that belong to them
+    let operatorBusIds = null;
+    if (req.user && req.user.userType === 'operator') {
+      const operatorId = req.user._id || req.user.id;
+      const operatorBuses = await Bus.find({ 
+        operatorId: mongoose.Types.ObjectId(operatorId) 
+      }).select('_id').lean();
+      
+      // Convert busIds to ObjectId format for $in query
+      operatorBusIds = operatorBuses.map(bus => mongoose.Types.ObjectId(bus._id));
+      
+      console.log('Operator ID:', operatorId);
+      console.log('Operator buses found:', operatorBuses.length);
+      console.log('Operator busIds:', operatorBusIds);
+      
+      // If operator has no buses, return empty result
+      if (operatorBusIds.length === 0) {
+        const options = {
+          page: req.query.page || 1,
+          limit: req.query.per_page || 10,
+          collation: { locale: "en" },
+          customLabels: {
+            totalDocs: "totalRecords",
+            docs: "bookings",
+          },
+        };
+        return res.json({ 
+          data: {
+            bookings: [],
+            totalRecords: 0,
+            totalPages: 0,
+            page: options.page,
+            limit: options.limit
+          } 
+        });
+      }
+    }
+    
+    // Build match condition
+    const matchCondition = { is_deleted: false };
+    if (operatorBusIds && operatorBusIds.length > 0) {
+      matchCondition.busId = { $in: operatorBusIds };
+    }
+    console.log('Match condition:', JSON.stringify(matchCondition, null, 2));
+    
     const aggregateQuery = Booking.aggregate([
       {
-        $match: { is_deleted: false },
+        $match: matchCondition,
       },
       {
         $lookup: {
@@ -190,7 +240,10 @@ exports.list = async (req, res, next) => {
         },
       },
       {
-        $unwind: "$route",
+        $unwind: {
+          path: "$route",
+          preserveNullAndEmptyArrays: true,
+        },
       },
       {
         $lookup: {
@@ -201,7 +254,10 @@ exports.list = async (req, res, next) => {
         },
       },
       {
-        $unwind: "$bus",
+        $unwind: {
+          path: "$bus",
+          preserveNullAndEmptyArrays: true,
+        },
       },
       {
         $lookup: {
@@ -212,7 +268,10 @@ exports.list = async (req, res, next) => {
         },
       },
       {
-        $unwind: "$bus_type",
+        $unwind: {
+          path: "$bus_type",
+          preserveNullAndEmptyArrays: true,
+        },
       },
       {
         $lookup: {
@@ -223,7 +282,10 @@ exports.list = async (req, res, next) => {
         },
       },
       {
-        $unwind: "$bus_layout",
+        $unwind: {
+          path: "$bus_layout",
+          preserveNullAndEmptyArrays: true,
+        },
       },
       {
         $lookup: {
@@ -313,7 +375,10 @@ exports.list = async (req, res, next) => {
         },
       },
       {
-        $unwind: "$payment",
+        $unwind: {
+          path: "$payment",
+          preserveNullAndEmptyArrays: true,
+        },
       },
       {
         $project: {

@@ -31,6 +31,7 @@ const listBuses = {
     reg_no: Joi.string(),
     max_seats: Joi.string(),
     status: Joi.string(),
+    travel_status: Joi.string().allow(null, ''),
 
     // certificate_registration: Joi.string(),
     // certificate_pollution: Joi.string(),
