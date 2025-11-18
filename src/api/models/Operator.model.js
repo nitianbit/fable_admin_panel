@@ -12,6 +12,12 @@ const { jwtSecret, jwtExpirationInterval } = require('../../config/vars');
  * @private
  */
 const operatorSchema = new mongoose.Schema({
+    // Reference to Admin who created/owns the operator
+    adminId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Admin',
+        index: true,
+    },
     // Company Information
     companyName: {
         type: String,
@@ -255,7 +261,7 @@ operatorSchema.methods = {
     transform() {
         const transformed = {};
         const fields = [
-            'id', 'companyName', 'companyCode', 'businessType', 'email', 'phone', 
+            'id', 'adminId', 'companyName', 'companyCode', 'businessType', 'email', 'phone', 
             'countryCode', 'address', 'registrationNumber', 'gstNumber', 'panNumber',
             'licenseNumber', 'licenseExpiryDate', 'contactPerson', 'documents',
             'status', 'isVerified', 'fleetSize', 'maxFleetSize', 'maxNoOfSeats', 'commissionRate',

@@ -167,6 +167,7 @@ exports.create = async (req, res, next) => {
       website,
       socialMedia,
       documents,
+      adminId,
     } = req.body;
 
     const FolderName = process.env.S3_BUCKET_OPERATOR || "operators";
@@ -239,6 +240,13 @@ exports.create = async (req, res, next) => {
       };
     }
 
+    // Set adminId either from payload or from authenticated admin user
+    if (adminId) {
+      objOperator.adminId = adminId;
+    } else if (req.user && req.user._id) {
+      objOperator.adminId = req.user._id;
+    }
+
     const operator = new Operator(objOperator);
     const savedOperator = await operator.save();
 
@@ -292,7 +300,7 @@ exports.update = async (req, res, next) => {
       'gstNumber', 'panNumber', 'licenseNumber', 'licenseExpiryDate',
       'contactPerson', 'status', 'fleetSize', 'maxFleetSize', 'roleId',
       'maxNoOfSeats', 'commissionRate', 'paymentTerms', 'description',
-      'website', 'socialMedia'
+      'website', 'socialMedia', 'adminId'
     ];
     
     const objUpdate = {};

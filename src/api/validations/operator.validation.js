@@ -51,7 +51,8 @@ const createOperator = {
       insuranceDocument: Joi.string().allow(''),
       permitDocument: Joi.string().allow(''),
       logo: Joi.string().allow('')
-    }).default({})
+    }).default({}),
+    adminId: Joi.string().custom(objectId).allow(null, '')
   }).unknown(),
 };
 
@@ -123,7 +124,8 @@ const updateOperator = {
       insuranceDocument: Joi.string().allow(''),
       permitDocument: Joi.string().allow(''),
       logo: Joi.string().allow('')
-    })
+    }),
+    adminId: Joi.string().custom(objectId)
   }).unknown(),
 };
 

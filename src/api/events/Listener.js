@@ -7,6 +7,7 @@ const Admin = require("../models/admin.model");
 const mongoose = require("mongoose");
 const s3 = require("../../config/s3");
 const BookingAssign = require("../models/bookingAssign.model");
+const Bus = require("../models/bus.model");
 const Ticket = require("../models/ticket.model");
 const Booking = require("../models/booking.model");
 
