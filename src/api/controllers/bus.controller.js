@@ -684,6 +684,8 @@ exports.list = async (req, res, next) => {
       {
         $project:{
           ids: "$_id",
+          adminId: "$adminId",
+          operatorId: "$operatorId",
           name: 1,
           reg_no:1,
           brand: 1,
