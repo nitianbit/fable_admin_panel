@@ -144,7 +144,7 @@ adminSchema.method({
 
   token() {
     const payload = {
-      exp: moment().add(jwtExpirationInterval, 'minutes').unix(),
+      exp: moment().add(jwtExpirationInterval, 'hours').unix(),
       iat: moment().unix(),
       sub: this._id,
       type: 'Bearer',
