@@ -8,9 +8,9 @@ const router = express.Router();
 
 router
   .route('/')
-  .get(getAuth('master.admin'), controller.load)
+  .get(getAuth('master.admin', 'operator'), controller.load)
   .post(
-    getAuth('bus.type.create', 'master.admin'),
+    getAuth('bus.type.create', 'master.admin', 'operator'),
     Validate(bustypeValidation.createBusTypes),
     controller.create,
   );
@@ -18,7 +18,7 @@ router
 router
   .route('/search')
   .get(
-    getAuth('bus.type.view', 'master.admin'),
+    getAuth('bus.type.view', 'master.admin', 'operator'),
     Validate(bustypeValidation.listBusTypes),
     controller.list,
   );
@@ -27,7 +27,7 @@ router
   .route('/:bustypeId')
 
   .get(
-    getAuth('bus.type.edit', 'master.admin'),
+    getAuth('bus.type.edit', 'master.admin', 'operator'),
     Validate(bustypeValidation.getBusTypes),
     controller.get,
   )
@@ -35,7 +35,7 @@ router
    * update the single location
    * */
   .patch(
-    getAuth('bus.type.edit', 'master.admin'),
+    getAuth('bus.type.edit', 'master.admin', 'operator'),
     Validate(bustypeValidation.updateBusTypes),
     controller.update,
   )
@@ -44,7 +44,7 @@ router
    * */
 
   .delete(
-    getAuth('bus.type.delete', 'master.admin'),
+    getAuth('bus.type.delete', 'master.admin', 'operator'),
     Validate(bustypeValidation.deleteBusTypes),
     controller.remove,
   );

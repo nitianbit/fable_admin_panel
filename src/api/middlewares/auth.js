@@ -95,20 +95,40 @@ const authHandleJWT =
 
       if (user) {
         console.log('allowedPerms', allowedPerms);
-        const getPerms = await Role.getPermission(user.roleId);
-        if (getPerms) {
-          const checkPermissions = getPerms.permissions
-            .map(role => allowedPerms.includes(role.slug))
-            .find(role => role === true);
-          console.log('checkPermissions', checkPermissions);
-          if (!checkPermissions) {
-            apiError.status = httpStatus.FORBIDDEN;
-            apiError.message = 'Forbidden';
-            return next(apiError);
+        
+        // Check if user is an operator and 'operator' is in allowed permissions
+        if (user.userType === 'operator' && allowedPerms.includes('operator')) {
+          const operatorId = user._id || user.id;
+          const operator = await Operator.findById(operatorId).exec();
+          if (operator && !operator.isDeleted && operator.status !== 'Inactive') {
+            req.user = user;
+            req.operator = operator;
+            return next();
           }
+        }
+        
+        // Check if 'master.admin' is in allowed permissions (bypass role check for master admin)
+        if (allowedPerms.includes('master.admin') && user.userType === 'admin') {
           req.user = user;
           return next();
         }
+        
+        // Normal permission check for other roles (only if user has roleId)
+        if (user.roleId) {
+          const getPerms = await Role.getPermission(user.roleId);
+          if (getPerms) {
+            const checkPermissions = getPerms.permissions
+              .map(role => allowedPerms.includes(role.slug))
+              .find(role => role === true);
+            console.log('checkPermissions', checkPermissions);
+            if (checkPermissions) {
+              req.user = user;
+              return next();
+            }
+          }
+        }
+        
+        // If we reach here, user doesn't have required permissions
         apiError.status = httpStatus.FORBIDDEN;
         apiError.message = 'Forbidden';
         return next(apiError);

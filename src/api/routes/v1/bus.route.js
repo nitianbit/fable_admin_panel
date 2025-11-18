@@ -26,32 +26,32 @@ router
   
 router
   .route('/')
-  .get(getAuth('bus.load', 'master.admin'), controller.load)
-  .post(getAuth('bus.create', 'master.admin'), Validate(busValidation.createBuses), controller.create);
+  .get(getAuth('bus.load', 'master.admin', 'operator'), controller.load)
+  .post(getAuth('bus.create', 'master.admin', 'operator'), Validate(busValidation.createBuses), controller.create);
 
 
 router
   .route('/search')
-  .get(getAuth('bus.view', 'master.admin'), Validate(busValidation.listBuses), controller.list);
+  .get(getAuth('bus.view', 'master.admin', 'operator'), Validate(busValidation.listBuses), controller.list);
 
 
 router
   .route('/:busId')
 
-  .get(getAuth('bus.edit', 'master.admin'), controller.get)
+  .get(getAuth('bus.edit', 'master.admin', 'operator'), controller.get)
   /**
   * update the single location
   * */
-  .patch(getAuth('bus.edit', 'master.admin'), Validate(busValidation.updateBuses), controller.update)
+  .patch(getAuth('bus.edit', 'master.admin', 'operator'), Validate(busValidation.updateBuses), controller.update)
 /**
   * delete  the single location
   * */
 
-  .delete(getAuth('bus.delete', 'master.admin'), Validate(busValidation.deleteBuses), controller.remove);
+  .delete(getAuth('bus.delete', 'master.admin', 'operator'), Validate(busValidation.deleteBuses), controller.remove);
 
 router
   .route('/:busId/:document_type')
-  .patch(getAuth('buses', 'master.admin'), upload.single('pic'), controller.uploadDocument);
+  .patch(getAuth('buses', 'master.admin', 'operator'), upload.single('pic'), controller.uploadDocument);
 
 
 module.exports = router;

@@ -1,5 +1,6 @@
 const httpStatus = require("http-status");
 const { omit, isEmpty } = require("lodash");
+const mongoose = require("mongoose");
 const Listeners = require("../events/Listener");
 const Bus = require("../models/bus.model");
 const Route = require("../models/route.model");
@@ -49,7 +50,15 @@ exports.isRegistrationExists = async (req, res, next) => {
  */
  exports.load = async (req, res, next) => {
   try {
-    const bus = await Bus.find({status:true}).populate("bustypeId");
+    let query = { status: true };
+    
+    // If user is an operator, filter by their operatorId
+    if (req.user && req.user.userType === 'operator') {
+      const operatorId = req.user._id || req.user.id;
+      query.operatorId = mongoose.Types.ObjectId(operatorId);
+    }
+    
+    const bus = await Bus.find(query).populate("bustypeId");
     res.status(httpStatus.OK);
     res.json({
       message: 'Bus Type load data.',
@@ -70,7 +79,15 @@ exports.isRegistrationExists = async (req, res, next) => {
     
     //const getTimetable = await TimeTable.find({status:true},"busId");
     //const getBusId = getTimetable.map((v) => { return v.busId });
-    const getBuses = await Bus.find({}).populate("buslayoutId").lean();
+    let query = {};
+    
+    // If user is an operator, filter by their operatorId
+    if (req.user && req.user.userType === 'operator') {
+      const operatorId = req.user._id || req.user.id;
+      query.operatorId = mongoose.Types.ObjectId(operatorId);
+    }
+    
+    const getBuses = await Bus.find(query).populate("buslayoutId").lean();
     console.log("getBuses",getBuses);
     res.status(httpStatus.OK);
     res.json({
@@ -92,6 +109,27 @@ exports.isRegistrationExists = async (req, res, next) => {
 exports.get = async (req, res) => {
   try {
     const bus = await Bus.findById(req.params.busId).populate("adminId").populate("bustypeId");
+    
+    // If user is an operator, check if bus belongs to them
+    if (req.user && req.user.userType === 'operator') {
+      const operatorId = req.user._id || req.user.id;
+      if (!bus || bus.operatorId?.toString() !== operatorId.toString()) {
+        res.status(httpStatus.FORBIDDEN);
+        return res.json({
+          message: "You don't have permission to access this bus.",
+          status: false,
+        });
+      }
+    }
+    
+    if (!bus) {
+      res.status(httpStatus.NOT_FOUND);
+      return res.json({
+        message: "Bus not found.",
+        status: false,
+      });
+    }
+    
     res.status(httpStatus.OK);
     res.json({
       message: "Bus fetched successfully.",
@@ -112,6 +150,20 @@ exports.uploadDocument = async (req, res, next) => {
     const { busId } = req.params;
     const { document_type } = req.params;
     console.log(busId);
+    
+    // If user is an operator, check if bus belongs to them
+    if (req.user && req.user.userType === 'operator') {
+      const busexists = await Bus.findById(busId).exec();
+      const operatorId = req.user._id || req.user.id;
+      if (!busexists || busexists.operatorId?.toString() !== operatorId.toString()) {
+        res.status(httpStatus.FORBIDDEN);
+        return res.json({
+          message: "You don't have permission to upload documents for this bus.",
+          status: false,
+        });
+      }
+    }
+    
     if (!req.file) {
       res.status(httpStatus.NOT_FOUND);
       res.json({
@@ -305,6 +357,15 @@ exports.create = async (req, res, next) => {
       status,
       amenities,
     };
+    
+    // If user is an operator, automatically set operatorId
+    if (req.user && req.user.userType === 'operator') {
+      const operatorId = req.user._id || req.user.id;
+      objBus.operatorId = operatorId;
+    } else if (req.body.operatorId) {
+      // Allow admin to set operatorId if provided
+      objBus.operatorId = req.body.operatorId;
+    }
     if (picture) {
       objBus.picture = await imageUpload(
         picture,
@@ -375,6 +436,27 @@ exports.create = async (req, res, next) => {
 exports.update = async (req, res, next) => {
   try {
     const busexists = await Bus.findById(req.params.busId).exec();
+    
+    // If user is an operator, check if bus belongs to them
+    if (req.user && req.user.userType === 'operator') {
+      const operatorId = req.user._id || req.user.id;
+      if (!busexists || busexists.operatorId?.toString() !== operatorId.toString()) {
+        res.status(httpStatus.FORBIDDEN);
+        return res.json({
+          message: "You don't have permission to update this bus.",
+          status: false,
+        });
+      }
+    }
+    
+    if (!busexists) {
+      res.status(httpStatus.NOT_FOUND);
+      return res.json({
+        message: "Bus not found.",
+        status: false,
+      });
+    }
+    
     const FolderName = process.env.S3_BUCKET_BUS;
     const objUpdate = {
       adminId: req.body.adminId,
@@ -388,6 +470,15 @@ exports.update = async (req, res, next) => {
       chassis_no:req.body.chassis_no,
       amenities:req.body.amenities,
     };
+    
+    // If user is an operator, ensure operatorId is set to their ID
+    if (req.user && req.user.userType === 'operator') {
+      const operatorId = req.user._id || req.user.id;
+      objUpdate.operatorId = operatorId;
+    } else if (req.body.operatorId) {
+      // Allow admin to update operatorId if provided
+      objUpdate.operatorId = req.body.operatorId;
+    }
 
     if (Bus.isValidBase64(req.body.picture)) {
       await imageDelete(busexists.picture, FolderName);
@@ -472,60 +563,60 @@ exports.update = async (req, res, next) => {
 exports.list = async (req, res, next) => {
   try {
     
+    // Base condition - if user is an operator, filter by their operatorId
+    // This will be applied in the initial $match stage before $project
+    let baseCondition = {};
+    if (req.user && req.user.userType === 'operator') {
+      const operatorId = req.user._id || req.user.id;
+      baseCondition.operatorId = mongoose.Types.ObjectId(operatorId);
+    }
+    console.log('baseCondition', baseCondition);
+    
+    // Condition for final $match (after $project) - only include fields that are in $project
+    // operatorId is already filtered in initial $match, so we don't need it here
     let condition = req.query.global_search
       ? {
-          $and: [
+          $or: [
             {
-              $or: [
-                {
-                  name: {
-                    $regex: new RegExp(req.query.global_search),
-                    $options: "i",
-                  },
-                },
-                // {
-                //   max_seats: {
-                //     $regex: new RegExp(req.query.global_search),
-                //     $options: "i",
-                //   },
-                // },
-                {
-                  reg_no: {
-                    $regex: new RegExp(req.query.global_search),
-                    $options: "i",
-                  },
-                },
-                {
-                  brand: {
-                    $regex: new RegExp(req.query.global_search),
-                    $options: "i",
-                  },
-                },
-                {
-                  model_no: {
-                    $regex: new RegExp(req.query.global_search),
-                    $options: "i",
-                  },
-                },
-                {
-                  chassis_no: {
-                    $regex: new RegExp(req.query.global_search),
-                    $options: "i",
-                  },
-                },
-                {
-                  'type': {
-                    $regex: new RegExp(req.query.global_search),
-                    $options: "i",
-                  },
-                },
-                { status: req.query.global_search != 'inactive'}
-                
-              ],
+              name: {
+                $regex: new RegExp(req.query.global_search),
+                $options: "i",
+              },
             },
+            {
+              reg_no: {
+                $regex: new RegExp(req.query.global_search),
+                $options: "i",
+              },
+            },
+            {
+              brand: {
+                $regex: new RegExp(req.query.global_search),
+                $options: "i",
+              },
+            },
+            {
+              model_no: {
+                $regex: new RegExp(req.query.global_search),
+                $options: "i",
+              },
+            },
+            {
+              chassis_no: {
+                $regex: new RegExp(req.query.global_search),
+                $options: "i",
+              },
+            },
+            {
+              type: {
+                $regex: new RegExp(req.query.global_search),
+                $options: "i",
+              },
+            },
+            { status: req.query.global_search != 'inactive' ? 'Active' : 'Inactive' }
           ],
         }
-      : { };
+      : {};
 
 
     let sort = {};
@@ -552,6 +643,8 @@ exports.list = async (req, res, next) => {
     }
 
     const aggregateQuery = Bus.aggregate([
+      // Add initial match for operatorId if user is an operator (more efficient to filter early)
+      ...(Object.keys(baseCondition).length > 0 ? [{ $match: baseCondition }] : []),
       {
         $lookup: {
           from: "admins",
@@ -617,9 +710,8 @@ exports.list = async (req, res, next) => {
           createdAt:1
         }
       },
-      {
-        $match: condition,
-      },
+      // Only apply final match if condition is not empty (operatorId is already filtered in initial match)
+      ...(Object.keys(condition).length > 0 ? [{ $match: condition }] : []),
     ]);
 
     const options = {
@@ -666,15 +758,36 @@ exports.list = async (req, res, next) => {
 exports.remove = async (req, res, next) => {
   try{
     const FolderName = process.env.S3_BUCKET_BUS;
+    
+    // Check if bus exists
+    const busexists = await Bus.findById(req.params.busId).exec();
+    
+    if (!busexists) {
+      res.status(httpStatus.NOT_FOUND);
+      return res.json({
+        message: "Bus not found.",
+        status: false,
+      });
+    }
+    
+    // If user is an operator, check if bus belongs to them
+    if (req.user && req.user.userType === 'operator') {
+      const operatorId = req.user._id || req.user.id;
+      if (busexists.operatorId?.toString() !== operatorId.toString()) {
+        res.status(httpStatus.FORBIDDEN);
+        return res.json({
+          message: "You don't have permission to delete this bus.",
+          status: false,
+        });
+      }
+    }
 
     if(await busSchedule.exists({busId:req.params.busId})){
       res.status(httpStatus.OK).json({
         status: false,
         message: 'Remove the bus schedule first!',
        })
-
-     }else if(await Bus.exists({_id:req.params.busId})){
-        const busexists = await Bus.findOne({_id:req.params.busId});
+     } else {
         if(Bus.isValidURL(busexists.picture)){
           await imageDelete(busexists.picture,FolderName);
         }

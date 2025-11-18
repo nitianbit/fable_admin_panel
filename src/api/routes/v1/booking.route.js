@@ -11,7 +11,7 @@ const router = express.Router();
 
 router
   .route('/search')
-  .get(getAuth('booking.view', 'master.admin'), controller.list);
+  .get(getAuth('booking.view', 'master.admin', 'operator'), controller.list);
 
 
 router
